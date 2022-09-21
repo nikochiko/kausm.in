@@ -1,0 +1,29 @@
+baseURL = 'https://kausm.in/'
+languageCode = 'en-us'
+title = 'Kaustubh M.'
+theme="PaperMod"
+
+[params]
+
+  [params.homeInfoParams]
+  Title = "Kaustubh Maske Patil"
+  Content = """\
+    20 | Software developer and decent chess player
+
+    Hey! 👋
+    I'm Kaustubh, your neighbourhood nerd. \
+    I write code, play chess, and take pride in knowing absolutely \
+    random things.
+    """
+
+  [[params.socialIcons]]
+  name = "github"
+  url = "https://github.com/nikochiko"
+
+  [[params.socialIcons]]
+  name = "twitter"
+  url = "https://twitter.com/n1kochiko"
+
+  [[params.socialIcons]]
+  name = "lichess"
+  url = "https://lichess.org/@/kaustico"
