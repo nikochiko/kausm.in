@@ -5,7 +5,7 @@ draft: false
 tags: [dead-simple]
 ---
 
-A dead simple way to run a SMTP server for your development environment and testing.
+Dead simple SMTP server for development and testing.
 
 # aiosmtpd for development setup
 
@@ -19,23 +19,21 @@ recipients of the email. For example, take any of these common scenarios:
 
 I was recently faced with this when building a guided project for a training [[1]]({{< relref "#references" >}}).
 One of the tasks in that project was for the students was to use SMTP credentials
-from the config to send an email for a notification. For that reason, the solution
-had to be very simple to use.
+from the config to send an email notification.
 
-I did some research and recommended students to do this:
+I did some research and found aiosmtpd (standard library's [`smtpd`](https://docs.python.org/3/library/smtpd.html)
+recommends using this package). All we need to do is:
 ```
 pip3 install aiosmtpd
 aiosmtpd -n
 ```
 
-That's it! An SMTP server is now running on `loaclhost:8025` and its default configuration is perfect.
-
-That's brilliant if you are working locally. You don't need to write more code to monkeypatch
-the mailer function and stop the SMTP logic from executing. Just change the dev-configuration and it
-just works.
+That's it! An SMTP server is now running on `localhost:8025` and it will print any received emails to console.
+That's brilliant if working locally, the default configuration is exactly what we need.
+No need for more code to monkeypatch in testing environment, just some configuration changes.
 
 You can even [`netcat`](https://linux.die.net/man/1/nc) to this port and try sending emails
-with raw handwritten SMTP commands. Now that's something incredibly satisfying.
+with raw SMTP commands.
 
 # Extending aiosmtpd
 
@@ -43,14 +41,17 @@ If local setup is all you wanted to know about, you can close the blog at this p
 on and share how we solved another interesting problem - verifying that code written by our students
 was correct and that emails were actually being sent.
 
-Now the caveat is that we were deploying our students' code to a website of their own [[2]]({{< relref "#references" >}}). The checks we
-had were using API endpoints.
+Now the caveat is that we were deploying our students' code to a website of their own [[2]]({{< relref "#references" >}})
+and the checks should use HTTP endpoints on those websites for checking results. Because we had our
+own deployment we had the luxury to be able to override certain environment variables on a per-request
+basis without making changes to the application code (CGI is powerful!).
 
-Because we were hosting all our students' sites and our verification site on the same VM (a droplet),
-we could start this on localhost and extend the server to log the emails to a file.
+I could write an extension class in less than 50 lines of code that writes the email content to a single
+file, and then we can read from the same file to get the latest email. At our scale, this was enough because
+it was a very rare case that two people would run their checks at the same time and end up writing over
+another's email before the check runs.
 
-That's what we did. Because extending `aiosmtpd` is so simple, I could just write the extension in
-a single file in less than 50 lines of code.
+This is the code:
 
 ```python
 # email package is part of the Python standard library,
@@ -80,6 +81,19 @@ class MailFile(Message):
             g = Generator(f, mangle_from_=True, maxheaderlen=120)
             g.flatten(message)
 
+    def get_latest_message(mail_file):
+        """Returns an email.message.Message object
+
+        Useful accessors on Message object:
+        `message["X-MailFrom"]`
+        `message["X-RcptTo"]`
+        `message.get_payload()` -> str | list[str]
+        `message.is_multipart()` -> bool
+        """
+        p = Parser()
+        with open(mail_file) as f:
+            return p.parse(f)
+
     @classmethod
     def from_cli(cls, parser, *args):
         # this gets the args received on command line
@@ -88,20 +102,6 @@ class MailFile(Message):
         elif len(args) > 1:
             parser.error("Too many arguments for Mailbox handler")
         return cls(args[0])
-
-
-def get_latest_message(mail_file):
-    """Returns email.message.Message class object
-
-    Message class can be used like this:
-    `message["X-MailFrom"]`
-    `message["X-RcptTo"]`
-    `message.get_payload() -> str | list[str]`
-    `message.is_multipart() -> bool`
-    """
-    p = Parser()
-    with open(mail_file) as f:
-        return p.parse(f)
 ```
 
 Then if we package and pip install it as `mailcatcher`, we can write:
@@ -114,6 +114,57 @@ file and the [documentation](https://aiosmtpd.readthedocs.io/en/latest/handlers.
 
 This is the [`gist`](https://gist.github.com/nikochiko/93650f67235d93b8a35e090a5dcc5fed)
 
+# Unit tests with aiosmtpd
+
+The same class that we wrote can be used for unit testing as well. Except in this case, you might not want to
+have a long-running process for the SMTP server, and rather start/stop it for each test.
+
+Here's how you can extend the same mailcatcher to build a pytest fixture which does that:
+
+```python
+import pytest
+from aiosmtpd.controller import Controller
+from mailcatcher import MailFile
+
+from app import config, function_that_should_send_email
+
+
+@pytest.fixture
+def mailcatcher(tmp_path):
+    """Fixture to setup a temporary email server
+
+    `tmp_path` is provided by pytest.
+    """
+    mail_file = tmp_path / "testing.mail"
+    catcher = MailFile(mail_file)
+    # you can set a different hostname/port as args to `Controller`
+    controller = Controller(catcher)
+    controller.start()
+    config.update(smtp_hostname="localhost", smtp_port="8025",
+                  smtp_username="", smtp_password="")
+    yield catcher
+    controller.stop()
+
+
+def test_email_is_sent(mailcatcher):
+    address = "eva.lu.ator@example.com"
+
+    # procedure to be tested
+    function_that_should_send_email(address)
+
+    latest_email = mailcatcher.get_latest_email()
+    assert latest_email is not None
+    assert latest_email["X-RcptTo"] == address  # or a loose check like `address in latest_email["X-RcptTo"]`
+    assert "expected content" in latest_email.get_payload()
+```
+
+Again, quite straightforward.
+
+I should mention that [`lazr.smtptest`](https://pythonhosted.org/lazr.smtptest/lazr/smtptest/docs/usage.html)
+is also a good alternative with a similar API and workings, made especially for testing.
+
+---
+
 Thanks for reading!
 If you liked it or have some feedback, let me know on [Twitter](https://twitter.com/n1kochiko)
 or [Telegram](https://t.me/nikochiko).
@@ -122,4 +173,4 @@ or [Telegram](https://t.me/nikochiko).
 
 **[1]** *The training was delivered by [Pipal Academy](https://pipal.in). The guided project in question is open source: [repo link](https://github.com/pipalacademy/rajdhani). This repo has the skeleton needed, and the tasks are mentioned on the [dashboard](https://rajdhani.pipal.in). If you want to host this project and run in your own group, the code for dashboard site is available here: [repo link](https://github.com/pipalacademy/rajdhani-challenge). Let us know and we will help you do it.*
 
-**[2]** *We built our own deployment platform for this, called ["Hamr"](https://github.com/pipalacademy/hamr). We satirically call it the "next-gen" serverless platform. There were many philosophical decisions that went into its design. It deserves a blog post of its own.*
+**[2]** *We built our own deployment platform for this, called ["Hamr"](https://github.com/pipalacademy/hamr). We satirically call it the "next-gen" serverless platform. There were philosophical decisions that went into its design and it deserves a blog post of its own.*
