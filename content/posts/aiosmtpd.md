@@ -1,57 +1,79 @@
 ---
-title: "Local SMTP server for development and testing, with aiosmtpd"
+title: "Dead simple SMTP server for development and testing"
 date: 2022-09-21T17:15:43+05:30
 draft: false
 tags: [dead-simple]
 ---
 
-Dead simple SMTP server for development and testing.
+# Local development setup
 
-# aiosmtpd for development setup
+When we have some code that sends emails, we probably also want a stub that we can use locally --
+which won't send actual emails, let us inspect the content of each outgoing mail, and let us
+conduct tests.
 
-When we have some code that sends emails, we are faced with the question of what to do for a local
-setup. We don't want to send actual emails, but we still want to inspect the contents, senders and
-recipients of the email. For example, take any of these common scenarios:
-- a verification step where the link is sent by email, and while testing locally, you want
-  to quickly find out what it is
-- a notification email that you want to verify is being sent correctly
-- an email template that you want to verify is being susbtituted correctly
+I needed something like this when we were building the skeleton of a guided project for a training
+[[1]]({{< relref "#references" >}}).
+One of the tasks was for the students to send an email notification upon some action.
 
-I was recently faced with this when building a guided project for a training [[1]]({{< relref "#references" >}}).
-One of the tasks in that project was for the students was to use SMTP credentials
-from the config to send an email notification.
+We had two use-cases for an SMTP server like this here:
+1. To recommend to the students for trying their code locally, and
+2. To test that the emails were being sent once it is deployed.
 
-I did some research and found aiosmtpd (standard library's [`smtpd`](https://docs.python.org/3/library/smtpd.html)
-recommends using this package). All we need to do is:
+For the first, I needed something simple to use and deploy locally that I could easily recommend to others
+(and not have to spend time instructing them on how to configure XYZ).
+For the second, I wanted something that gets the job done without having me pay for some fancy SaaS.
+Luckily, I found a single solution that was good enough for both.
+
+I had to only look at the standard library ([`smtpd` package](https://docs.python.org/3/library/smtpd.html))
+to find what looked like the perfect solution -- something as simple as `python -m http.server`.
+But the documentation there recommended using another library (an asyncio replacement) -
+`aiosmtpd`. I tried both and ended up going with `aiosmtpd` because
+interacting with it as a client was simple to do for humans.
+`smtpd` required ending all commands with `<CRLF>.<CRLF>`, at least with the default
+configuration. That is a tricky sequence to type for humans.
+
+`aiosmtpd` though, was just perfect! This is all that needed to be done:
 ```
 pip3 install aiosmtpd
 aiosmtpd -n
 ```
 
 That's it! An SMTP server is now running on `localhost:8025` and it will print any received emails to console.
-That's brilliant if working locally, the default configuration is exactly what we need.
-No need for more code to monkeypatch in testing environment, just some configuration changes.
+That's brilliant if working locally, the default is exactly what we need.
+No need for more code or monkeypatching, just some configuration tweaks.
 
-You can even [`netcat`](https://linux.die.net/man/1/nc) to this port and try sending emails
-with raw SMTP commands.
+You can even [`netcat`](https://linux.die.net/man/1/nc) to this port and try sending emails with raw SMTP
+commands. It can be quite satisfying
+[from my own experience](https://twitter.com/n1kochiko/status/1460821886925901827).
 
-# Extending aiosmtpd
+Besides ease of interacting for human clients, there are some more reasons to prefer `aiosmtpd`
+over `smtpd` (in case you have to choose for your own needs):
+1. Extending it is very simple, [as we will see](#extending-aiosmtpd).
+2. Its default invocation (with only one CLI flag) starts the debugging server that
+we want. No option values to remember.
+3. `smtpd` is deprecated and will be removed from the standard library in Python3.12.
+
+# Extending `aiosmtpd`
 
 If local setup is all you wanted to know about, you can close the blog at this point. But I'll go
-on and share how we solved another interesting problem - verifying that code written by our students
+on and share how we solved another interesting problem -- verifying that code written by our students
 was correct and that emails were actually being sent.
 
 Now the caveat is that we were deploying our students' code to a website of their own [[2]]({{< relref "#references" >}})
 and the checks should use HTTP endpoints on those websites for checking results. Because we had our
 own deployment we had the luxury to be able to override certain environment variables on a per-request
-basis without making changes to the application code (CGI is powerful!).
+basis without making changes to the application code (CGI is powerful!). This meant we could
+use a different SMTP configuration when certain HTTP headers were received.
 
-I could write an extension class in less than 50 lines of code that writes the email content to a single
-file, and then we can read from the same file to get the latest email. At our scale, this was enough because
-it was a very rare case that two people would run their checks at the same time and end up writing over
-another's email before the check runs.
+With that being sorted, I could write an extension class in less than 50 lines of code that
+writes the email content to a single
+file. We could then read from the same file to get the latest email. At our scale this was
+good enough. I didn't need to worry about 10 people simultaneously submitting and overwriting
+the files for each other, but if that were a concern for you, the
+[`Maildir`](https://aiosmtpd.readthedocs.io/en/latest/handlers.html#aiosmtpd.handlers.Mailbox)
+convention can be used instead.
 
-This is the code:
+This is the code for the extension, with comments for clarity:
 
 ```python
 # email package is part of the Python standard library,
@@ -114,7 +136,7 @@ file and the [documentation](https://aiosmtpd.readthedocs.io/en/latest/handlers.
 
 This is the [`gist`](https://gist.github.com/nikochiko/93650f67235d93b8a35e090a5dcc5fed)
 
-# Unit tests with aiosmtpd
+# Unit tests with `aiosmtpd`
 
 The same class that we wrote can be used for unit testing as well. Except in this case, you might not want to
 have a long-running process for the SMTP server, and rather start/stop it for each test.
@@ -158,8 +180,6 @@ def test_email_is_sent(mailcatcher):
     assert "expected content" in latest_email.get_payload()
 ```
 
-Again, quite straightforward.
-
 I should mention that [`lazr.smtptest`](https://pythonhosted.org/lazr.smtptest/lazr/smtptest/docs/usage.html)
 is also a good alternative with a similar API and workings, made especially for testing.
 
@@ -173,4 +193,4 @@ or [Telegram](https://t.me/nikochiko).
 
 **[1]** *The training was delivered by [Pipal Academy](https://pipal.in). The guided project in question is open source: [repo link](https://github.com/pipalacademy/rajdhani). This repo has the skeleton needed, and the tasks are mentioned on the [dashboard](https://rajdhani.pipal.in). If you want to host this project and run in your own group, the code for dashboard site is available here: [repo link](https://github.com/pipalacademy/rajdhani-challenge). Let us know and we will help you do it.*
 
-**[2]** *We built our own deployment platform for this, called ["Hamr"](https://github.com/pipalacademy/hamr). We satirically call it the "next-gen" serverless platform. There were philosophical decisions that went into its design and it deserves a blog post of its own.*
+**[2]** *We built our own deployment platform for this, called ["Hamr"](https://github.com/pipalacademy/hamr). We satirically call it the "next-gen" serverless platform. It is made to be as simple and boring as possible -- using CGI to make the apps serverless and deployment script being a human-readable cURL without an elaborate JSON body. There were philosophical decisions that went into its design and it deserves a blog post of its own.*
