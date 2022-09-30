@@ -17,4 +17,4 @@ then
 fi
 
 # build static site with hugo
-rm -r "$APP_ROOT/site/*" && hugo -b http://kaustubh.kaustubh-dev.pipal.in/ -d "$APP_ROOT/site"
+rm -r "$APP_ROOT/site" && hugo -b http://kaustubh.kaustubh-dev.pipal.in/ -d "$APP_ROOT/site"
