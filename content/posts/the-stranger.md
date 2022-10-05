@@ -16,9 +16,7 @@ separation from his fiance, his death sentence, and of course the
 death of his mother. None of these incidents were profound enough to throw
 the man into some odd kind of reflections on his life. He never regretted
 any of his actions, and as he proved to the chaplain towards the end, he
-didn't change his religious beliefs despite much attempt. My impression of 
-Mersault was merely someone numb to everything but the basest
-human feelings.
+didn't change his religious beliefs despite much attempt.
 
 It was as if his every action was actually an inaction. No action was
 his own "wish". He didnt wish to kill the Arab, but it was the weather
