@@ -5,6 +5,8 @@ theme="PaperMod"
 
 [params]
 
+  ShowFullTextInRSS = true
+
   [params.homeInfoParams]
   Title = "Kaustubh Maske Patil"
   Content = """\
