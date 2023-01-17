@@ -15,6 +15,8 @@ languages, compilers and interpreters, and Haskell.
 
 I'll add more about me at some point ...
 
+Interests: <a>Python, Haskell, Programming Languages, Functional Programming, Machine Learning, self-hosting</a>
+
 Projects:
 [autosaved](https://github.com/nikochiko/autosaved),
 [metapy](https://github.com/nikochiko/metapy),

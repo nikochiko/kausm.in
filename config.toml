@@ -12,11 +12,12 @@ theme="PaperMod"
   Content = """\
     20 | Software developer. Amateur chess player. Never went to a college.
 
-    Interests: <i>Python, Haskell, Programming Languages, Functional Programming, Machine Learning, self-hosting</i>
+    I contribute to and build FOSS for fun, and ocassionally write about programming.
+    My current interest is in the design and implementation of programming languages.
 
-    Projects: <a target="_blank" href="https://github.com/nikochiko/autosaved">autosaved</a>, \
-              <a target="_blank" href="https://github.com/nikochiko/metapy">metapy</a>, \
-              <a target="_blank" href="https://github.com/pipalacademy/kutty">kutty (at work)</a>
+    I have a broad skill set that is still expanding. I have good experience in web development,
+    infra, Python, Linux, and machine learning. I am currently learning more about programming
+    languages, compilers and interpreters, and Haskell.
 
     <a href="/about-me">More about me...</a>
     """
