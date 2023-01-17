@@ -1,6 +1,6 @@
 .PHONY: build deploy run
 
-DOMAINS = "kausm.in" "kaustubh.page"
+DOMAINS = "kaustubh.page"
 
 deploy:
 	for domain in $(DOMAINS); do \
