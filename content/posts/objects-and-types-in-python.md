@@ -51,15 +51,15 @@ metaclasses need to inherit from `type`. [<sup>1</sup>](#footnotes)
 
 ### Relationship between `object` and `type`
 
-There are at least 3 things about this that are confusing:
+There are three things about this, that are confusing when considered together:
 
-1.  `object` is a `class`
-2.  All `class`es are objects of the type `type`.
+1.  `object` is a *class*
+2.  All classes are objects of the type `type`.
 3.  `type` itself is a class
 
 We can verify this in the Python interpreter.
 
-If an `object` is a `class`, it should be an instance of the `type` class.
+If an `object` is a class, it should be an instance of the `type` class.
 
 ```python
 >>> isinstance(object, type)
@@ -82,7 +82,7 @@ True
 
 _Checks out._
 
-Now let's see if `type` is a `class`. For this, we will check whether `type` is an instance of `type` and whether `type` is an `object`.
+Now let's see if `type` is a class. For this, we will check whether `type` is an instance of `type` and whether `type` is an `object`.
 
 ```python
 >>> isinstance(type, type)
@@ -357,7 +357,7 @@ to show this that will mimick the behaviour of the `class` keyword as closely as
 At the end, we should be able to define classes with something like this:
 
 ```python
-@create_class
+@create_class()
 def A():
 	x = 10	
 	def __init__(self, y, z):
@@ -371,8 +371,8 @@ a = A(5, 10)
 We should also be able to perform inheritance.
 
 ```python
-@create_class
-def B(A):
+@create_class(A)
+def B():
 	x = 20
 	return locals()
 
@@ -382,20 +382,20 @@ b = B(5, 10)  # y and z, as in A.__init__
 And use metaclasses:
 
 ```python
-@create_class
-def Meta(type):
+@create_class(type)
+def Meta():
     def __repr__(self):
         return f"Meta {self.__name__}"
 	return locals()
 
-@create_class
-def C(metaclass=Meta):
+@create_class(metaclass=Meta)
+def C():
     pass
 ```
 
 This syntax is very similar to the one used to declare classes with the `class` keyword, except that it is a `def`, has a `create_class` decorator, and returns [`locals()`]().
 
-The decorator gets the function object, and can access the parameters and default arguments. From there, we can resolve the variables from `globals()` and initialise the `class`.
+The decorator gets the function object, and can access the parameters and default arguments. From there, we can resolve the variables from `globals()` and initialise the class.
 
 Feel free to give it a try now before reading on with the solution.
 
@@ -407,38 +407,49 @@ will return the `locals()` dict from inside and use that for building the third 
 in initialisation.
 
 ```python
-def create_class(func):
-    bases = get_params(func)
-    kwds = get_defaults(func)
-
-    resolved_bases = tuple(resolve(base, env=globals()) for base in bases)
-    func_locals = func(*resolved_bases)
-
-    meta = kwds.get("metaclass", type)
-    klass = meta(
-        func.__name__, resolved_bases, func_locals
-    )
-    return klass
-
-# get_params, get_defaults, and resolve
-
-def get_params(func):
-    code = func.__code__
-    defaults = func.__defaults__ or []
-    arg_names = code.co_varnames[:code.co_argcount]
-    return arg_names if not defaults else arg_names[:-len(defaults)]
-
-def get_defaults(func):
-    code = func.__code__
-    defaults = func.__defaults__ or []
-    arg_names = code.co_varnames[:code.co_argcount][-len(defaults):]
-    return dict(zip(arg_names, defaults))
-
-def resolve(var, env):
-    return env.get(varname, getattr(__builtins__, "type"))
+def create_class(*bases, **kwds):
+    def wrapper(func):
+        metaclass = kwds.get("metaclass", type)
+        func_locals = func()
+        klass = metaclass(
+            func.__name__, bases, func_locals,
+        )
+        return klass
+    return wrapper
 ```
 
 Now, the examples above will work and we can recreate the `class` keyword without using it.
+
+These examples should work now:
+```python
+@create_class()
+def A():
+    x = 20
+    return locals()
+
+@create_class(A)
+def B():
+    y = 30
+
+    def __init__(self, foo, bar):
+        self.foo = foo
+        self.bar = bar
+
+    return locals()
+
+@create_class(type)
+def Meta():
+    def __repr__(self):
+        return f"meta {self.__name__}"
+    return locals()
+
+@create_class(B, metaclass=Meta)
+def C():
+    return locals()
+```
+
+We created a simple class, a subclass, a metaclass, and a class which uses that metaclass without
+using a decorator that spans less than 10 lines of code.
 
 We can even get rid of the need to return `locals()` from the definitions if we use something like [`inspect.getsource`](https://docs.python.org/3/library/inspect.html#inspect.getsource) and then performing an [`exec`](https://realpython.com/python-exec/) on the function body and supplying a local env, but `inspect.getsource` will actually read the literal text from the Python file to produce the output. I didn't want to get that hacky and stick to what is always available at runtime.
 
@@ -455,6 +466,6 @@ The _objects all the way down_ philosophy has its quirks, but it also makes Pyth
 Footnotes
 ---------
 
-_\[1\] In fact, Python allows you to define your own metaclasses. Then the class will be an instance of a different type other than the default that is_ `type`. _Note that metaclasses also need to subclass from_ `type`, _so the stated relationship between_ `type` _and_ `classes` _still holds._
+_\[1\] In fact, Python allows you to define your own metaclasses. Then the class will be an instance of a different type other than the default that is_ `type`. _Note that metaclasses also need to subclass from_ `type`, _so the stated relationship between_ `type` _and_ classes _still holds._
 
 _\[2\] Example borrowed from_ [_Descriptor HowTo Guide_](https://docs.python.org/3/howto/descriptor.html)_, Python documentation._
