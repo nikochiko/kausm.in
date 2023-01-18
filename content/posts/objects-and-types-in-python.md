@@ -104,23 +104,20 @@ In the CPython implementation, there are two basic structs for `PyObject` and `P
 ```c
 // a simplified struct definition for PyObject and PyTypeObject
 
-typedef struct PyObject {
-    PyTypeObject_HEAD
+typedef struct _object PyObject;
+typedef struct _typeobject PyTypeObject;
+
+struct _object {
+    PyTypeObject *ob_type;
     // and other metadata
-} PyObject;
+};
 
-typedef struct Tuple {
-    PyTypeObject_HEAD
-    int length;
-    PyObject** elements;
-} Tuple;
-
-typedef struct PyTypeObject {
+struct _typeobject {
     PyObject_HEAD  // macro to "inherit" from PyObject
-    char name[50];
-    Tuple* bases;
+    const char  *name;
+    PyObject    *bases;
     // and other things
-} PyTypeObject;
+};
 ```
 
 Here, we can see that `type`'s inheritance of `object` isn't like a usual parent-child class relationship, but one that happens because `PyTypeObject` is a struct that inherits from `PyObject`. 
@@ -128,18 +125,17 @@ Here, we can see that `type`'s inheritance of `object` isn't like a usual parent
 To make it clear, let's try to write the C code that will represent such a relationship:
 
 ```c
-PyTypeObject type_ = { .name = "type" };
-type_.ob_type = &type_;
+// let's assume this function is defined and initialises a tuple with a single PyObject
+PyObject* tuple_init(PyObject*);
 
-PyObject object_ = { .name = "object" };
-object_.ob_type = &type_;
+PyTypeObject type = { .name = "type" };
+type.ob_base.ob_type = &type;
 
-PyObject* type_elements[] = { &object_, };
-Tuple type_bases = {
-	.elements = (PyObject**) type_elements,
-	.length = sizeof(type_elements)/sizeof(PyObject*),
-};
-type_.bases = &type_bases;
+PyTypeObject object = { .name = "object" };
+object.ob_base.ob_type = &type;
+
+// type.bases needs to be set to a Python Tuple
+type.bases = tuple_init((PyObject*) &object);
 ```
 
 wtfpython has a good explanation on this [here](https://github.com/satwikkansal/wtfpython#-the-chicken-egg-problem-) and CPython has comments explaining this too: [https://github.com/python/cpython/blob/a286caa937405f7415dcc095a7ad5097c4433246/Include/object.h#L24-L29](https://github.com/python/cpython/blob/a286caa937405f7415dcc095a7ad5097c4433246/Include/object.h#L24-L29)
