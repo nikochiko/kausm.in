@@ -51,7 +51,7 @@ metaclasses need to inherit from `type`. [<sup>1</sup>](#footnotes)
 
 ### Relationship between `object` and `type`
 
-There are three things about this, that are confusing when considered together:
+There are three things about this that are confusing when considered together:
 
 1.  `object` is a *class*
 2.  All classes are objects of the type `type`.
@@ -95,14 +95,40 @@ _See, I wasn't lying._
 
 What's happening here? type is a type, type is also an object, and object is itself a type.
 
-This relationship is confusing because it is modelled only in the underlying implementation and not in pure Python. 
+We can understand this relationship better with `issubclass`:
+
+```python
+>>> issubclass(type, object)
+True
+>>> issubclass(object, type)
+False
+```
+
+While `type` is a subclass of `object`, `object` isn't a subclass of `type`.
+Instead, only the *type* of `object` is `type`. That is, an `object` is an *instance* of `type`.
+
+This diagram captures this relationship accurately:
+
+![](/objects-and-types-in-python/object-type-excalidraw.png)
+
+Each object has a type, some other metadata, and its attributes associated to it. A type itself
+has everything that an object does (including a type), along with some extra fields such as
+the base classes that it borrows from.
+
+This relationship can be better understood when we take a look at how it is implemented
+in CPython.
 
 ### `PyObject` and `PyTypeObject`
 
-In the CPython implementation, there are two basic structs for `PyObject` and `PyTypeObject` that look kind of like this:
+In the CPython implementation, there are two basic structs for `PyObject` and `PyTypeObject`
+that look kind of like this. Notice that the `_object` struct has a pointer to its type
+(`*ob_type`), and there is a separate `bases` tuple in `_typeobject` that stores the bases
+for a type object.
 
 ```c
 // a simplified struct definition for PyObject and PyTypeObject
+
+#define PyObject_HEAD       PyObject ob_base;
 
 typedef struct _object PyObject;
 typedef struct _typeobject PyTypeObject;
@@ -120,7 +146,8 @@ struct _typeobject {
 };
 ```
 
-Here, we can see that `type`'s inheritance of `object` isn't like a usual parent-child class relationship, but one that happens because `PyTypeObject` is a struct that inherits from `PyObject`. 
+The `ob_type` of `object` is manually set to `type`, and this `object` is then added to the
+`bases` tuple in `type`.
 
 To make it clear, let's try to write the C code that will represent such a relationship:
 
